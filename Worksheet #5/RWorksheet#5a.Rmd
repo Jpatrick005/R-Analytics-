@@ -10,6 +10,39 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-312123+1214
+
+# Install the necessary package (if you don't have it)
+# install.packages("rvest")
+
+library(rvest)
+
+# Amazon product URL
+url <- "https://www.amazon.com/Xbox-X-1TB-Digital/dp/B0DCD9LGHY/ref=sr_1_5?dib=eyJ2IjoiMSJ9.JEzB3Z-U9iuKV_Jv8eujLbkY6LWXKLO27WC-qZPSps098EwtLNtQ61PerOUQYBZfeGokcaeKyn0nnPeCjPHXTxmRQQsA09e_t3Sxjb0lOJ4Rb8cB7Up-4K6J85zIF2dRn5e9ZViIKJtiqZZ2K85klPJFeElpVExMnatmF3WSIFBRcIzHZjzb-zlB8VvZEtwIAG7sZA28dPOxVQuzs5V7rWBclImN7l0M7Ib18odFZgU.xAzx3Ark70mQb22x8q5vPd40ynbNSDa7Aet3JAKmzRw&dib_tag=se&qid=1730855603&s=videogames-intl-ship&sr=1-5&th=1"
+
+# Read the webpage
+page <- read_html(url)
+
+# Extract Price
+price <- page %>%
+  html_node(".a-price-whole") %>%
+  html_text()
+
+# Extract Product Description
+description <- page %>%
+  html_node("#productDescription p") %>%
+  html_text()
+
+# Extract Ratings
+ratings <- page %>%
+  html_node("span[data-asin='B0D3X6B4MV']") %>%
+  html_text()
+
+# Extract Number of Reviews
+reviews_count <- page %>%
+  html_node("#acrCustomerReviewText") %>%
+  html_text()
+
+# Print the extracted data
+cat("Price:", price, "\nDescription:", description, "\nRatings:", ratings, "\nReviews:", reviews_count, "\n")
 
 ```
