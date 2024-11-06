@@ -1,0 +1,14 @@
+---
+title: 'RWorksheet #5a'
+author: "Malayas, Pauchano, Madayag BSIT2A"
+date: "2024-11-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
