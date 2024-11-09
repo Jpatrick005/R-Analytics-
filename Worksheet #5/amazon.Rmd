@@ -11,14 +11,14 @@ library(dplyr)
 library(ggplot2)
 
 urls <- c(
-  'https://www.amazon.com/s?k=backpacks',
-  'https://www.amazon.com/s?k=laptops',
-  'https://www.amazon.com/s?k=headsets',
-  'https://www.amazon.com/s?k=mountain+bike',
-  'https://www.amazon.com/s?k=tshirt'
+  'https://www.amazon.com/s?k=gpu&crid=5O6UN0DOCV31&sprefix=gp%2Caps%2C308&ref=nb_sb_noss_2',
+  'https://www.amazon.com/s?k=cpu&crid=1V74KAQBN8KR4&sprefix=cpu%2Caps%2C303&ref=nb_sb_noss_1',
+  'https://www.amazon.com/s?k=headset&crid=1LVDGNS341ROA&sprefix=head%2Caps%2C306&ref=nb_sb_ss_ts-doa-p_2_4',
+  'https://www.amazon.com/s?k=camera&crid=3138M61DHN7M&sprefix=camer%2Caps%2C331&ref=nb_sb_noss_2',
+  'https://www.amazon.com/s?k=Watch&crid=ON423ZCM7RT2&sprefix=wa%2Caps%2C332&ref=nb_sb_noss_2'
 )
 
-categories <- c("Backpacks", "Laptops", "Headset", "Mountain Bike", "Tshirt")
+categories <- c("GPU", "CPU", "Headset", "Camera", "Watch")
 
 product_data <- list()
 for (i in seq_along(urls)) {
@@ -32,14 +32,14 @@ for (i in seq_along(urls)) {
     html_text() %>%
     head(30) %>%
     gsub("[^0-9.]", "", .)
-product_rating <- scrape(session) %>%
-  html_nodes('i.a-icon-star-small') %>%
-  html_node('span.a-icon-alt') %>%  
-  html_text() %>%
-  head(30) %>%
-  gsub("[^0-9.]", "", .)
+  product_rating <- scrape(session) %>%
+    html_nodes('i.a-icon-star-small') %>%
+    html_nodes('span.a-icon-alt') %>%
+    html_text() %>%
+    head(30) %>%
+    gsub("[^0-9.]", "", .)
+  product_rating[product_rating == ""] <- NA
   min_length <- min(length(product_name), length(product_price), length(product_rating))
-
   product_data[[i]] <- data.frame(
     Product_Name = product_name[1:min_length],
     Price = suppressWarnings(as.numeric(product_price[1:min_length])),
@@ -49,10 +49,17 @@ product_rating <- scrape(session) %>%
   )
 }
 
+
 final_data <- do.call(rbind, product_data)
+
+
 final_data$Price[is.na(final_data$Price)] <- 0
+
+
 final_data_clean <- final_data %>%
   filter(!is.na(Price), !is.na(Rating))
+
+
 ggplot(final_data_clean, aes(x = Price, y = Rating)) +
   geom_point(color = "blue") +
   facet_wrap(~ Category, scales = "free") +
@@ -60,6 +67,5 @@ ggplot(final_data_clean, aes(x = Price, y = Rating)) +
        x = "Price",
        y = "Rating") +
   theme_minimal()
+
 ```
-
-
