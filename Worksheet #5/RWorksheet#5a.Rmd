@@ -1,0 +1,53 @@
+---
+title: 'WorkSheet #5'
+author: "Malayas, Pauchano, Madayag BSIT2A"
+date: "2024-11-09"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# libraries
+library(polite)
+library(httr)
+library(rvest)
+library(dplyr)
+```
+
+
+```{r}
+# Set URL and establish session
+imdb_url <- "https://www.imdb.com/chart/toptv/?sort=rank%2Casc"
+imdb_session <- bow(imdb_url, user_agent = "Educational")
+imdb_session
+```
+
+
+```{r}
+# Extract TV show titles and ranks
+tv_titles <- read_html(imdb_url) %>%
+  html_nodes('.ipc-title__text') %>%
+  html_text()
+```
+
+
+```{r}
+# transform extracted titles
+tv_titles_df <- as.data.frame(tv_titles[3:27], stringsAsFactors = FALSE)
+colnames(tv_titles_df) <- "ranked_titles"
+```
+
+
+```{r}
+# Rename and delete columns
+split_rank_title <- strsplit(as.character(tv_titles_df$ranked_titles), "\\.", fixed = FALSE)
+split_rank_title_df <- data.frame(do.call(rbind, split_rank_title), stringsAsFactors = FALSE)
+colnames(split_rank_title_df) <- c("Rank", "Title")
+split_rank_title_df$Title <- trimws(split_rank_title_df$Title)
+
+ranked_titles_df <- split_rank_title_df
+```
+
+
