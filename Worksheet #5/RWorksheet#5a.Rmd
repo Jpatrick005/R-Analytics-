@@ -2,7 +2,9 @@
 title: 'WorkSheet #5'
 author: "Malayas, Pauchano, Madayag BSIT2A"
 date: "2024-11-09"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -14,10 +16,9 @@ library(polite)
 library(httr)
 library(rvest)
 library(dplyr)
-```
 
 
-```{r}
+
 # Set URL and establish session
 imdb_url <- "https://www.imdb.com/chart/toptv/?sort=rank%2Casc"
 imdb_session <- bow(imdb_url, user_agent = "Educational")
@@ -48,6 +49,40 @@ colnames(split_rank_title_df) <- c("Rank", "Title")
 split_rank_title_df$Title <- trimws(split_rank_title_df$Title)
 
 ranked_titles_df <- split_rank_title_df
+```
+
+
+```{r}
+# Extract ratings, number of votes, episodes, and release years
+tv_ratings <- read_html(imdb_url) %>%
+  html_nodes('.ipc-rating-star--rating') %>%
+  html_text()
+```
+
+
+```{r}
+tv_votes <- read_html(imdb_url) %>%
+  html_nodes('.ipc-rating-star--voteCount') %>%
+  html_text()
+cleaned_votes <- gsub('[()]', '', tv_votes)
+```
+
+
+```{r}
+# Extract episode counts 
+episode_counts <- read_html(imdb_url) %>%
+  html_nodes('span.sc-5bc66c50-6.OOdsw.cli-title-metadata-item:nth-of-type(2)') %>%
+  html_text()
+cleaned_episodes <- gsub('[eps]', '', episode_counts)
+episode_counts_num <- as.numeric(cleaned_episodes)
+```
+
+
+```{r}
+# Extract release years
+release_years <- read_html(imdb_url) %>%
+  html_nodes('span.sc-5bc66c50-6.OOdsw.cli-title-metadata-item:nth-of-type(1)') %>%
+  html_text()
 ```
 
 
