@@ -111,70 +111,211 @@ release_years <- read_html(imdb_url) %>%
 
 
 
-
+4. Select 5 categories from Amazon and select 30 products from each category.
 ```{r}
-library(polite)
 library(rvest)
+library(httr)
 library(dplyr)
-library(ggplot2)
+library(polite)
+library(stringr)
 
-urls <- c(
-  'https://www.amazon.com/s?k=gpu&crid=5O6UN0DOCV31&sprefix=gp%2Caps%2C308&ref=nb_sb_noss_2',
-  'https://www.amazon.com/s?k=cpu&crid=1V74KAQBN8KR4&sprefix=cpu%2Caps%2C303&ref=nb_sb_noss_1',
-  'https://www.amazon.com/s?k=headset&crid=1LVDGNS341ROA&sprefix=head%2Caps%2C306&ref=nb_sb_ss_ts-doa-p_2_4',
-  'https://www.amazon.com/s?k=camera&crid=3138M61DHN7M&sprefix=camer%2Caps%2C331&ref=nb_sb_noss_2',
-  'https://www.amazon.com/s?k=Watch&crid=ON423ZCM7RT2&sprefix=wa%2Caps%2C332&ref=nb_sb_noss_2'
+# User-Agent Pool
+user_agents <- c(
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:92.0) Gecko/20100101 Firefox/92.0"
 )
 
-categories <- c("GPU", "CPU", "Headset", "Camera", "Watch")
+# Base URL and Categories
+urls <- c(
+  'https://www.amazon.com/s?k=gpu',    
+  'https://www.amazon.com/s?k=cpu',            
+  'https://www.amazon.com/s?k=headset',          
+  'https://www.amazon.com/s?k=camera',  
+  'https://www.amazon.com/s?k=keyboard'
+)
 
-product_data <- list()
-for (i in seq_along(urls)) {
-  session <- bow(urls[i], user_agent = "Educational")
-  product_name <- scrape(session) %>%
-    html_nodes('span.a-size-medium') %>%
-    html_text() %>%
-    head(30)
-  product_price <- scrape(session) %>%
-    html_nodes('span.a-price-whole') %>%
-    html_text() %>%
-    head(30) %>%
-    gsub("[^0-9.]", "", .)
-  product_rating <- scrape(session) %>%
-    html_nodes('i.a-icon-star-small') %>%
-    html_nodes('span.a-icon-alt') %>%
-    html_text() %>%
-    head(30) %>%
-    gsub("[^0-9.]", "", .)
-  product_rating[product_rating == ""] <- NA
-  min_length <- min(length(product_name), length(product_price), length(product_rating))
-  product_data[[i]] <- data.frame(
-    Product_Name = product_name[1:min_length],
-    Price = suppressWarnings(as.numeric(product_price[1:min_length])),
-    Rating = suppressWarnings(as.numeric(product_rating[1:min_length])),
-    Category = categories[i],
-    stringsAsFactors = FALSE
+category_df <- data.frame(
+  URL = urls,
+  Category = c(
+    "GPU",
+    "CPU",
+    "Headset",
+    "Camera",
+    "Keyboard"
+  )
+)
+
+```
+5. Extract the price, description, ratings and reviews of each product.
+  - Code to scrape price, description, and ratings of each products:
+```{r}
+amazon_products <- function(url) {
+  # Randomly choose a user agent
+  user_agent <- sample(user_agents, 1)
+  
+  # Load the page with polite requests
+  bow_url <- bow(url, user_agent = user_agent)
+  page <- scrape(bow_url)
+  
+  # Extract product names
+  name <- page %>%
+    html_nodes(".a-size-medium.a-spacing-none.a-color-base.a-text-normal") %>%
+    html_text(trim = TRUE)
+  
+  # Extract prices and handle missing values
+  price <- page %>%
+    html_nodes("span.a-price-whole") %>%
+    html_text(trim = TRUE) %>%
+    gsub("[^0-9]", "", .) %>% 
+    as.numeric()
+  
+  # Extract ratings and handle missing values
+  ratings <- page %>%
+    html_nodes("span.a-icon-alt") %>%
+    html_text(trim = TRUE) %>%
+    gsub(" out of 5 stars", "", .) %>% 
+    as.numeric()
+  
+  # Adjust lengths of vectors to match
+  max_length <- min(30, length(name), length(price), length(ratings))
+  
+  # Create a data frame
+  data.frame(
+    Description = name[1:max_length],
+    Price = price[1:max_length],
+    Ratings = ratings[1:max_length]
   )
 }
 
+# Apply the function to the list of URLs with delays
+products <- lapply(urls, function(url) {
+  Sys.sleep(2)  # Add delay between requests
+  amazon_products(url)
+})
+names(products) <- category_df$Category
 
-final_data <- do.call(rbind, product_data)
+# Print results for verification
+products[["GPU"]]
+products[["CPU"]]
+products[["Headset"]]
+products[["Camera"]]
+products[["Keyboard"]]
 
-
-final_data$Price[is.na(final_data$Price)] <- 0
-
-
-final_data_clean <- final_data %>%
-  filter(!is.na(Price), !is.na(Rating))
-
-
-ggplot(final_data_clean, aes(x = Price, y = Rating)) +
-  geom_point(color = "blue") +
-  facet_wrap(~ Category, scales = "free") +
-  labs(title = "Price vs Rating for Each Product Category",
-       x = "Price",
-       y = "Rating") +
-  theme_minimal()
 
 ```
+
+Code to scrape reviews of each products
+```{r}
+# User-Agent rotation
+user_agents <- c(
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+)
+
+# Review scraping function with retries, user-agent rotation, and delay
+reviews_scrape <- function(url, retries = 3, wait_time = 10) {
+  try_count <- 0
+  while (try_count < retries) {
+    user_agent <- sample(user_agents, 1)  # Randomly select a user-agent
+    page <- tryCatch({
+      read_html(url, user_agent = user_agent)
+    }, error = function(e) {
+      return(NULL)  # Return NULL if there's an error (e.g., timeout)
+    })
+    
+    if (!is.null(page)) {
+      break
+    }
+    
+    try_count <- try_count + 1
+    if (try_count < retries) {
+      message("Retrying... Attempt ", try_count, " of ", retries)
+      Sys.sleep(wait_time)  # Wait before retrying
+    }
+  }
+  
+  if (try_count == retries) {
+    return(data.frame(review_links = NA))  # Return NA if all retries failed
+  }
+  
+  review_link <- page %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+  
+  return(data.frame(review_links = review_link[1:30]))
+}
+
+# Scraping the review links for each product category
+review_links_df <- lapply(urls, reviews_scrape)
+
+# Assigning the scraped review links to respective variables
+GPU <- review_links_df[[1]]$review_links
+CPU <- review_links_df[[2]]$review_links
+Headset <- review_links_df[[3]]$review_links
+Camera <- review_links_df[[4]]$review_links
+Keyboard <- review_links_df[[5]]$review_links
+
+# Function to scrape review text
+reviews_text <- function(urls) {
+  
+  results <- data.frame(
+    Reviews = character(length(urls)),  
+    stringsAsFactors = FALSE
+  )
+  
+  # loop through each URL
+  for (i in seq_along(urls)) {
+    if (is.na(urls[i])) {
+      results$Reviews[i] <- NA
+    } else {
+      # scrape reviews
+      page <- read_html(urls[i])
+      reviews_data <- page %>%
+        html_nodes("p.a-spacing-small") %>%
+        .[1] %>%  # Select the first paragraph node
+        html_text()
+
+      results$Reviews[i] <- if (length(reviews_data) > 0) reviews_data else NA
+    }
+  }
+  
+  return(results)
+}
+
+# Scraping reviews for each category
+GPU_reviews <- reviews_text(GPU)
+CPU_reviews <- reviews_text(CPU)
+Headset_reviews <- reviews_text(Headset)
+Camera_reviews <- reviews_text(Camera)
+Keyboard_reviews <- reviews_text(Keyboard)
+
+```
+
+
+Complete Data Frame of price, description, ratings and reviews of each product.
+```{r}
+# Replace the product with your new product categories
+GPU_category <- cbind(products[["GPU"]], GPU_reviews)
+CPU_category <- cbind(products[["CPU"]], CPU_reviews)
+Headset_category <- cbind(products[["Headset"]], Headset_reviews)
+Camera_category <- cbind(products[["Camera"]], Camera_reviews)
+Keyboard_category <- cbind(products[["Keyboard"]], Keyboard_reviews)
+```
+6. Describe the data you have extracted.
+
+The extracted data comprises of information from the five Amazon categories that we picked. These include the GPU, CPU, camera, headset, and Keyboard. 30 products were chosen for each category, for a total of 150 products, each with its own price, description, rating, and review.
+
+7. What will be your use case for the data you have extracted?
+
+If we use the retrieved data, we can try to determine the value for money provided by various product categories based on their rating and price. Calculating the rating-to-price ratio for each category allows us to determine which categories offer the best perceived quality for the money.
+
+
+8. Create graphs regarding the use case, and briefly explain it.
+
+The graph enables easy comparison of how well each category performs in terms of value for money. Categories with taller bars show a greater rating-to-price ratio, implying better perceived value for money.
+
 
