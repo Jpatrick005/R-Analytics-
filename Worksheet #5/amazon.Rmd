@@ -5,67 +5,93 @@ date: "2024-11-09"
 output: pdf_document
 ---
 ```{r}
-library(polite)
 library(rvest)
+library(httr)
 library(dplyr)
-library(ggplot2)
+library(polite)
+library(stringr)
 
+# URL for the Amazon search pages
 urls <- c(
-  'https://www.amazon.com/s?k=gpu&crid=5O6UN0DOCV31&sprefix=gp%2Caps%2C308&ref=nb_sb_noss_2',
+  'https://www.amazon.com/s?k=hoodie&crid=5O6UN0DOCV31&sprefix=gp%2Caps%2C308&ref=nb_sb_noss_2',
   'https://www.amazon.com/s?k=cpu&crid=1V74KAQBN8KR4&sprefix=cpu%2Caps%2C303&ref=nb_sb_noss_1',
   'https://www.amazon.com/s?k=headset&crid=1LVDGNS341ROA&sprefix=head%2Caps%2C306&ref=nb_sb_ss_ts-doa-p_2_4',
   'https://www.amazon.com/s?k=camera&crid=3138M61DHN7M&sprefix=camer%2Caps%2C331&ref=nb_sb_noss_2',
   'https://www.amazon.com/s?k=Watch&crid=ON423ZCM7RT2&sprefix=wa%2Caps%2C332&ref=nb_sb_noss_2'
 )
 
-categories <- c("GPU", "CPU", "Headset", "Camera", "Watch")
+category_df <- data.frame(
+  URL = urls,
+  Category = c(
+    "Hoodie",
+    "CPU",
+    "Headset",
+    "Camera",
+    "Watch"
+  )
+)
 
-product_data <- list()
-for (i in seq_along(urls)) {
-  session <- bow(urls[i], user_agent = "Educational")
-  product_name <- scrape(session) %>%
-    html_nodes('span.a-size-medium') %>%
+# Function to scrape product data from Amazon
+amazon_products <- function(url) {
+  page <- read_html(url)
+  
+  name <- page %>%
+    html_nodes("h2.a-size-mini") %>%
+    html_text()
+  
+  price <- page %>%
+    html_nodes("span.a-price-whole") %>%
     html_text() %>%
-    head(30)
-  product_price <- scrape(session) %>%
-    html_nodes('span.a-price-whole') %>%
+    gsub("\\.", "", .)  # Remove any periods that might be used as thousand separators
+  
+  ratings <- page %>%
+    html_nodes("span.a-icon-alt") %>%
     html_text() %>%
-    head(30) %>%
-    gsub("[^0-9.]", "", .)
-  product_rating <- scrape(session) %>%
-    html_nodes('i.a-icon-star-small') %>%
-    html_nodes('span.a-icon-alt') %>%
-    html_text() %>%
-    head(30) %>%
-    gsub("[^0-9.]", "", .)
-  product_rating[product_rating == ""] <- NA
-  min_length <- min(length(product_name), length(product_price), length(product_rating))
-  product_data[[i]] <- data.frame(
-    Product_Name = product_name[1:min_length],
-    Price = suppressWarnings(as.numeric(product_price[1:min_length])),
-    Rating = suppressWarnings(as.numeric(product_rating[1:min_length])),
-    Category = categories[i],
-    stringsAsFactors = FALSE
+    gsub(" out of 5 stars", "", .) %>%
+    gsub(" Stars & Up", "", .)
+  
+  productlink <- page %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    paste0("https://www.amazon.com", .)
+  
+  data.frame(
+    Name = name[1:30],
+    Price = price[1:30],
+    Ratings = ratings[1:30],
+    Link = productlink[1:30]
   )
 }
 
+# Scrape data for all the categories
+products <- lapply(urls, amazon_products)
+names(products) <- category_df$Category
 
-final_data <- do.call(rbind, product_data)
+# Function to clean and handle coercion warnings
+clean_data <- function(df) {
+  df %>%
+    mutate(
+      # Convert Price and Ratings to numeric values, replacing non-numeric values with NA
+      Price = as.numeric(gsub(",", "", Price)),
+      Ratings = as.numeric(Ratings),
+      
+      # Calculate Rating to Price Ratio, ensuring it's numeric and handle NAs properly
+      Rating_to_Price_Ratio = ifelse(!is.na(Price) & !is.na(Ratings), Ratings / Price, NA)
+    ) %>%
+    # Replace NA values with the mean of the respective columns
+    mutate(
+      Price = ifelse(is.na(Price), mean(Price, na.rm = TRUE), Price),
+      Ratings = ifelse(is.na(Ratings), mean(Ratings, na.rm = TRUE), Ratings)
+    )
+}
 
+# Clean the products data for each category
+cleaned_products <- lapply(products, clean_data)
 
-final_data$Price[is.na(final_data$Price)] <- 0
-
-
-final_data_clean <- final_data %>%
-  filter(!is.na(Price), !is.na(Rating))
-
-
-ggplot(final_data_clean, aes(x = Price, y = Rating)) +
-  geom_point(color = "blue") +
-  facet_wrap(~ Category, scales = "free") +
-  labs(title = "Price vs Rating for Each Product Category",
-       x = "Price",
-       y = "Rating") +
-  theme_minimal()
-
+# Display the cleaned data for each category
+cleaned_products[["Hoodie"]]
+cleaned_products[["CPU"]]
+cleaned_products[["Headset"]]
+cleaned_products[["Camera"]]
+cleaned_products[["Watch"]]
 ```
