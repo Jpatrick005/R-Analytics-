@@ -1,0 +1,159 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rvest)
+library(httr)
+library(dplyr)
+library(polite)
+library(stringr)
+
+# Define URLs for new product categories
+urls <- c('https://www.amazon.com/s?k=gpu&crid=3Q4RMLSH6DUR6&sprefix=gpu%2Caps%2C487&ref=nb_sb_ss_ts-doa-p_3_9', 
+          'https://www.amazon.com/s?k=cpu&crid=2ZKIRSD2IF4N2&sprefix=cpu%2Caps%2C520&ref=nb_sb_noss_2',
+          'https://www.amazon.com/s?k=headset&crid=1X7VVH5B54D6M&sprefix=headset%2Caps%2C523&ref=nb_sb_noss_2',
+          'https://www.amazon.com/s?k=camera&crid=24XFAZXZPHDY&sprefix=camera%2Caps%2C512&ref=nb_sb_noss_2',
+          'https://www.amazon.com/s?k=keyboard&crid=3T5HH8PA5FS8B&sprefix=keyboard%2Caps%2C512&ref=nb_sb_noss_2')
+
+```
+
+
+```{r}
+# Code to extract URLs of the 10 products per category
+gpu_links <- read_html(urls[1]) %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+
+cpu_links <- read_html(urls[2]) %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+
+headset_links <- read_html(urls[3]) %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+
+camera_links <- read_html(urls[4]) %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+
+keyboard_links <- read_html(urls[5]) %>%
+    html_nodes("a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal") %>%
+    html_attr("href") %>%
+    unique() %>%
+    paste0("https://www.amazon.com", .)
+
+# Data frame containing the URL of 10 products per category
+product_category_links <- data.frame(
+  GPU = gpu_links[1:10],
+  CPU = cpu_links[1:10],
+  Headset = headset_links[1:10],
+  Camera = camera_links[1:10],
+  Keyboard = keyboard_links[1:10]
+)
+
+```
+
+
+```{r}
+# URL of 10 products split into each of their category
+gpu_products_link <- product_category_links$GPU
+cpu_products_link <- product_category_links$CPU
+headset_products_link <- product_category_links$Headset
+camera_products_link <- product_category_links$Camera
+keyboard_products_link <- product_category_links$Keyboard
+```
+
+```{r}
+scrape_reviews <- function(url) {
+  page <- read_html(url)
+          
+  # Scraping the name of each product          
+  product_name <- page %>%
+    html_nodes(".a-size-large.product-title-word-break") %>%
+    html_text(trim = T) %>%
+    strsplit(" ") %>%
+    .[[1]] %>%
+    .[1:4] %>%
+    gsub("\\,", "", .) %>%
+    paste(collapse = " ")  
+  
+  # Scraping username of each reviewer
+  user_name_reviews <- page %>%
+    html_nodes(".a-profile-name") %>%
+    html_text() %>%
+    unique()
+  
+  # Scraping review dates of users
+  review_dates <- page %>%
+    html_nodes(".a-size-base.a-color-secondary.review-date") %>%
+    html_text() %>%
+    gsub(".*on ", "", .)
+  
+  # Scraping reviewer individual rating
+  reviewer_rating <- page %>%
+    html_nodes(".a-icon-alt") %>%
+    html_text() %>%
+    gsub(" out.*", "", .) %>%
+    .[grepl("^[0-9.]+$", .)] %>%
+    as.numeric()
+  
+  # Scraping review title
+  review_title <- page %>%
+    html_nodes(".a-size-base.a-link-normal.review-title.a-color-base.review-title-content.a-text-bold span:nth-of-type(2)") %>%
+    html_text()
+  
+  # Scraping text reviews of each user
+  text_reviews <- page %>%
+    html_nodes(".a-expander-content.reviewText.review-text-content.a-expander-partial-collapse-content") %>%
+    html_text(trim = TRUE)
+    
+  data.frame(
+    Product_Name = rep(product_name, 20),
+    Reviewer_Names = user_name_reviews[2:21],
+    Review_Date = review_dates[1:20],
+    Individual_Ratings = reviewer_rating[1:20],
+    Review_Title = review_title[1:20],
+    Text_Reviews = text_reviews[1:20]
+  )
+}
+
+# Applying scrape reviews to each of the product category's links
+gpu_reviews <- lapply(gpu_products_link, scrape_reviews)
+cpu_reviews <- lapply(cpu_products_link, scrape_reviews)
+headset_reviews <- lapply(headset_products_link, scrape_reviews)
+camera_reviews <- lapply(camera_products_link, scrape_reviews)
+keyboard_reviews <- lapply(keyboard_products_link, scrape_reviews)
+
+```
+
+```{r}
+# Combining the data frames of the product reviews per category
+gpu_reviews_df <- do.call(rbind, gpu_reviews)
+cpu_reviews_df <- do.call(rbind, cpu_reviews)
+headset_reviews_df <- do.call(rbind, headset_reviews)
+camera_reviews_df <- do.call(rbind, camera_reviews)
+keyboard_reviews_df <- do.call(rbind, keyboard_reviews)
+```
+
+```{r}
+# Code to view the contents of the product's data frame
+print(gpu_reviews_df)
+print(cpu_reviews_df)
+print(headset_reviews_df)
+print(camera_reviews_df)
+print(keyboard_reviews_df)
+```
